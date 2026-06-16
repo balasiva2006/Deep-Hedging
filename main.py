@@ -7,7 +7,11 @@ from src.data_handler import get_stock_params
 from src.quant_lib import black_scholes
 from src.trainer import run_mse_bootstrapping, run_cvar_tuning
 
-def generate_paths(S0, sigma, r, steps=375, num_paths=100000):
+def generate_paths(S0, sigma, r, K=None, steps=375, num_paths=100000):
+    # If no strike is provided, default to At-The-Money (K = S0)
+    if K is None:
+        K = S0
+        
     # Annualized T for one day
     T = (1/365.25) * (steps/375)
     dt = T/steps
@@ -21,7 +25,8 @@ def generate_paths(S0, sigma, r, steps=375, num_paths=100000):
     T_array = T - (np.arange(steps) * dt)
     BS_deltas = np.zeros((num_paths, steps))
     for t in range(steps):
-        _, d, _, _ = black_scholes(S_paths[:, t], S0, T_array[t], r, sigma, 'call')
+        # Use K instead of hardcoded S0
+        _, d, _, _ = black_scholes(S_paths[:, t], K, T_array[t], r, sigma, 'call')
         BS_deltas[:, t] = d
     return S_paths, BS_deltas
 
@@ -53,7 +58,9 @@ def main():
         
         stock_folder = f"checkpoints/{args.stock}"
         os.makedirs(stock_folder, exist_ok=True)
-        save_path = f"checkpoints/{args.stock}/model_latest.h5"
+        
+        # FIX: Appended .weights to the .h5 extension
+        save_path = f"checkpoints/{args.stock}/model_latest.weights.h5"
         model.save_weights(save_path)
         print(f"Weights saved to {save_path}")
 
@@ -66,7 +73,9 @@ def main():
         # Predict
         inp = tf.constant([[s_price/k_strike, bs_delta, 0.0]], dtype=tf.float32)
         delta, _ = model(inp, model.get_initial_states(1))
-        print(f"\n[RESULT] Recommended Hedge Delta: {delta.numpy()[0][  0]:.4f}")
+        
+        # FIX: Proper 2D NumPy indexing
+        print(f"\n[RESULT] Recommended Hedge Delta: {delta.numpy()[0, 0]:.4f}")
 
 if __name__ == "__main__":
     main()

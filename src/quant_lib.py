@@ -48,12 +48,15 @@ def calculate_pnl(S_path_batch, deltas_batch, K, r_tf, option_type_str, transact
     S_path_batch = tf.cast(S_path_batch, tf.float32)
     deltas_batch = tf.cast(deltas_batch, tf.float32)
     K = tf.cast(K, tf.float32)
+    # price_changes has shape [N, num_steps] (e.g. 375)
     price_changes = S_path_batch[:, 1:] - S_path_batch[:, :-1]
-    trading_pnl_per_interval = deltas_batch[:, :-1] * price_changes
+    # deltas_batch also has shape [N, num_steps] — one delta per interval
+    trading_pnl_per_interval = deltas_batch * price_changes
     cumulative_trading_pnl = tf.reduce_sum(trading_pnl_per_interval, axis=1)
     initial_fee = transaction_cost * S_path_batch[:, 0] * tf.abs(deltas_batch[:, 0])
     delta_changes = tf.abs(deltas_batch[:, 1:] - deltas_batch[:, :-1])
-    subsequent_fees = transaction_cost * S_path_batch[:, 1:] * delta_changes
+    # Use S_path_batch[:, 1:-1] to match the shape of delta_changes [N, num_steps-1]
+    subsequent_fees = transaction_cost * S_path_batch[:, 1:-1] * delta_changes
     total_transaction_costs = initial_fee + tf.reduce_sum(subsequent_fees, axis=1)
     S_T = S_path_batch[:, -1]
     # Simple Call payoff logic from notebook
